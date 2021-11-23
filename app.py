@@ -98,7 +98,7 @@ def create_dataset(terms):
             with TemporaryDirectory() as tmp_dir:
                 repo_owner, repo_name = hf_username, dataset_name
                 repo_namespace = f"{repo_owner}/{repo_name}"
-                repo_url = f'https://huggingface.co/{repo_namespace}'
+                repo_url = f'https://huggingface.co/datasets/{repo_namespace}'
 
                 repo = Repository(
                     tmp_dir,
@@ -106,6 +106,7 @@ def create_dataset(terms):
                     use_auth_token=st.session_state.token,
                     git_user=hf_username,
                     git_email=f'{hf_username}@users.noreply.huggingface.co',
+                    repo_type='dataset',
                 )
 
                 with st.spinner(f"Uploading files to [{repo_namespace}]({repo_url})..."):
