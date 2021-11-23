@@ -121,8 +121,9 @@ def huggingface_auth_form():
     is_logged_in = st.session_state.get('is_logged_in', False)
 
     if is_logged_in:
+        token = st.session_state.token
         with placeholder.container():
-            st.markdown(f"✅ Logged in as {whoami()['name']}")
+            st.markdown(f"✅ Logged in as {whoami(token)['name']}")
             do_logout = st.button("Logout")
         if do_logout:
             st.session_state.token = None
