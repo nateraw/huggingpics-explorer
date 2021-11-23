@@ -143,7 +143,7 @@ def main():
 
                         with repo.commit("Uploaded from HuggingPics Explorer"):
                             make_huggingpics_imagefolder(
-                                imagefolder_path, names, count=20, overwrite=True, resume=False, streamlit=True
+                                imagefolder_path, names, count=150, overwrite=True, resume=False, streamlit=True
                             )
                             zip_imagefolder(imagefolder_path, zipfile_path)
 
