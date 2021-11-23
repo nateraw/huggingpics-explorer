@@ -14,6 +14,7 @@ def show_images_of_term(search_term, num_cols=5, num_rows=3):
         for col_id in range(num_cols):
             cols[col_id].image(urls[row_id * num_cols + col_id], use_column_width=True)
 
+
 def explore():
     with st.sidebar:
         term_1 = st.sidebar.text_input('Search Term 1', value='shiba inu')
@@ -29,17 +30,16 @@ def explore():
 
 
 def create_dataset():
-    st.text("# Coming soon...")
+    st.markdown("# Coming soon...")
 
 
 def main():
-    
+
     with st.sidebar:
         mode = st.sidebar.selectbox("Mode", ["Explore", "Create Dataset"])
         st.sidebar.markdown("---")
 
     _ = explore() if mode == "Explore" else create_dataset()
-
 
 
 if __name__ == '__main__':
