@@ -153,6 +153,12 @@ def huggingface_auth_form():
 def main():
 
     with st.sidebar:
+        st.sidebar.title("🤗🖼 HuggingPics Explorer")
+        st.markdown(
+            """<p align="center"><a href="https://github.com/nateraw/huggingpics-explorer" alt="Repo"><img src="https://img.shields.io/github/stars/nateraw/huggingpics-explorer?style=social" /></a></p>""",
+            unsafe_allow_html=True,
+        )
+
         term_1 = st.sidebar.text_input('Search Term 1', value='shiba inu')
         term_2 = st.sidebar.text_input('Search Term 2', value='husky')
         term_3 = st.sidebar.text_input('Search Term 3', value='')
