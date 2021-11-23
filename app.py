@@ -1,6 +1,6 @@
 import logging
 import shutil
-import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -36,7 +36,7 @@ def download_image(img_url, filename):
         img_file.write(img_bytes)
 
 
-def make_huggingpics_imagefolder(data_dir, search_terms, count=150, overwrite=False, transform=None, resume=False):
+def make_huggingpics_imagefolder(data_dir, search_terms, count=150, overwrite=False, resume=False, streamlit=False):
 
     data_dir = Path(data_dir)
 
@@ -49,7 +49,8 @@ def make_huggingpics_imagefolder(data_dir, search_terms, count=150, overwrite=Fa
             if not resume:
                 return
 
-    pbar = st.progress(0)
+    if streamlit:
+        pbar = st.progress(0)
 
     for search_term_idx, search_term in enumerate(search_terms):
         search_term_dir = data_dir / search_term
@@ -67,93 +68,39 @@ def make_huggingpics_imagefolder(data_dir, search_terms, count=150, overwrite=Fa
             for i, url in enumerate(tqdm(urls)):
                 executor.submit(download_image, url, search_term_dir / f'{i}.jpg')
 
-        pbar.progress((search_term_idx + 1) / len(search_terms))
+        if streamlit:
+            pbar.progress((search_term_idx + 1) / len(search_terms))
 
-    pbar.empty()
-
-
-def create_dataset(terms):
-
-    msg_placeholder = st.empty()
-
-    for term in terms:
-        show_images_of_term(term)
-
-    with st.sidebar:
-        with st.form('Push to Hub'):
-            dataset_name = st.text_input('Dataset Name', value='huggingpics-data')
-            do_push = st.form_submit_button("Push to 🤗 Hub")
-
-    if do_push:
-        msg_placeholder.empty()
-        if not st.session_state.get('is_logged_in'):
-            msg_placeholder.error("You must login to push to the hub.")
-            return
-        else:
-            msg_placeholder.empty()
-
-        with st.sidebar:
-            repo_url = create_repo(dataset_name, st.session_state.token, exist_ok=True, repo_type='dataset')
-            hf_username = whoami(st.session_state.token)['name']
-            with TemporaryDirectory() as tmp_dir:
-                repo_owner, repo_name = hf_username, dataset_name
-                repo_namespace = f"{repo_owner}/{repo_name}"
-                repo_url = f'https://huggingface.co/datasets/{repo_namespace}'
-
-                repo = Repository(
-                    tmp_dir,
-                    clone_from=repo_url,
-                    use_auth_token=st.session_state.token,
-                    git_user=hf_username,
-                    git_email=f'{hf_username}@users.noreply.huggingface.co',
-                    repo_type='dataset',
-                )
-
-                with st.spinner(f"Uploading files to [{repo_namespace}]({repo_url})..."):
-                    with repo.commit("Uploaded from HuggingPics Explorer"):
-                        make_huggingpics_imagefolder(Path(tmp_dir) / 'images', terms, count=150)
-
-                st.success(f"View your dataset here 👉 [{repo_namespace}]({repo_url})")
+    if streamlit:
+        pbar.empty()
 
 
-def huggingface_auth_form():
-    placeholder = st.empty()
+def zip_imagefolder(data_dir, zip_path='images.zip'):
+    data_dir = Path(data_dir)
+    zip_file = zipfile.ZipFile(zip_path, 'w')
+    for img_path in data_dir.glob('**/*.jpg'):
+        zip_file.write(img_path, arcname=f"{img_path.parent.name}/{img_path.name}")
+    zip_file.close()
 
-    is_logged_in = st.session_state.get('is_logged_in', False)
 
-    if is_logged_in:
-        token = st.session_state.token
-        with placeholder.container():
-            st.markdown(f"✅ Logged in as {whoami(token)['name']}")
-            do_logout = st.button("Logout")
-        if do_logout:
-            st.session_state.token = None
-            st.session_state.is_logged_in = False
-            placeholder.empty()
-            huggingface_auth_form()
-    else:
-        with placeholder.container():
-            username = st.text_input('Username', value=st.session_state.get('username', ''))
-            password = st.text_input('Password', value="", type="password")
-            submit = st.button('Login')
-        if submit:
-            try:
-                st.session_state.token = login(username, password)
-                st.session_state.is_logged_in = True
-                placeholder.empty()
-                huggingface_auth_form()
-            except HTTPError as e:
-                st.session_state.token = None
-                st.session_state.is_logged_in = False
-                st.error("Invalid username or password.")
-                time.sleep(2)
-                # huggingface_auth_form()  # ???
+def get_search_terms():
+    terms = [
+        st.sidebar.text_input("Term 1:"),
+    ]
+    while terms[-1] != "":
+        terms.append(
+            st.sidebar.text_input(
+                f"Term {len(terms) + 1}:",
+            )
+        )
+    terms = terms[:-1]
+    return terms
 
 
 def main():
 
     with st.sidebar:
-        st.sidebar.title("🤗🖼 HuggingPics Explorer")
+        st.title('🤗🖼 HuggingPics Explorer')
         st.markdown(
             """
             <p align="center">
@@ -163,18 +110,46 @@ def main():
             unsafe_allow_html=True,
         )
 
-        term_1 = st.sidebar.text_input('Search Term 1', value='shiba inu')
-        term_2 = st.sidebar.text_input('Search Term 2', value='husky')
-        term_3 = st.sidebar.text_input('Search Term 3', value='')
-        term_4 = st.sidebar.text_input('Search Term 4', value='')
-        term_5 = st.sidebar.text_input('Search Term 5', value='')
-        terms = [t for t in [term_1, term_2, term_3, term_4, term_5] if t]
+    names = get_search_terms()
+    for name in names:
+        show_images_of_term(name)
 
-        st.markdown('---')
-        huggingface_auth_form()
-        st.markdown('---')
+    with st.sidebar:
+        with st.form("Upload to 🤗 Hub"):
+            username = st.text_input('Username')
+            password = st.text_input('Password', type="password")
+            dataset_name = st.text_input('Dataset Name', value='huggingpics-data')
+            submit = st.form_submit_button('Upload to 🤗 Hub')
+        if submit:
+            try:
+                token = login(username, password)
+                repo_url = create_repo(dataset_name, token, exist_ok=True, repo_type='dataset')
+                with TemporaryDirectory() as tmp_dir:
+                    repo_owner, repo_name = username, dataset_name
+                    repo_namespace = f"{repo_owner}/{repo_name}"
 
-    _ = create_dataset(terms)
+                    repo = Repository(
+                        tmp_dir,
+                        clone_from=repo_url,
+                        use_auth_token=token,
+                        git_user=username,
+                        git_email=f'{username}@users.noreply.huggingface.co',
+                        repo_type='dataset',
+                    )
+                    temp_path = Path(tmp_dir)
+                    imagefolder_path = temp_path / 'images/'
+                    zipfile_path = temp_path / 'images.zip'
+                    with st.spinner(f"Uploading files to [{repo_namespace}]({repo_url})..."):
+
+                        with repo.commit("Uploaded from HuggingPics Explorer"):
+                            make_huggingpics_imagefolder(
+                                imagefolder_path, names, count=20, overwrite=True, resume=False, streamlit=True
+                            )
+                            zip_imagefolder(imagefolder_path, zipfile_path)
+
+                st.success(f"View your dataset here 👉 [{repo_namespace}]({repo_url})")
+            except HTTPError as e:
+                st.error("Invalid username or password.")
 
 
 if __name__ == '__main__':
